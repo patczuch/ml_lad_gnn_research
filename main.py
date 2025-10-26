@@ -5,6 +5,7 @@ import os
 from torch_geometric.datasets import TUDataset
 from torch_geometric.data import DataLoader
 
+from models.base import PureNet
 from models.lad_base import STnet, Tenet
 from utils import evaluate_func
 
@@ -110,7 +111,12 @@ def main():
         input_dim = dataset.num_features
         num_classes = dataset.num_classes
 
-    if args.train_mode == 'S' or args.train_mode == 'O':
+    if args.train_mode == 'P':
+        model = PureNet(nfeat=input_dim, nhid=args.nhid, nclass=num_classes, gnn=args.backbone, nlayers=args.nlayers,
+                      gat_heads=args.gat_heads, dropout=args.dropout, with_bn=args.with_bn,
+                      with_bias=args.with_bias).to(device)
+
+    elif args.train_mode == 'S' or args.train_mode == 'O':
         model = STnet(nfeat=input_dim, nhid=args.nhid, nclass=num_classes, gnn=args.backbone, nlayers=args.nlayers,
                       gat_heads=args.gat_heads, dropout=args.dropout, with_bn=args.with_bn,
                       with_bias=args.with_bias).to(device)
@@ -181,7 +187,11 @@ def main():
                 inds = torch.tensor([data.ptr[i + 1] - data.ptr[i] for i in range(data.y.shape[0])]).to(device)
                 labs = torch.repeat_interleave(data.y, inds)
 
-                if args.train_mode == 'S':
+                if args.train_mode == 'P':
+                    out, st_map = model(data.x, data.edge_index, data.batch)  ##pure model
+                    loss_classification = nll_loss(out, data.y.view(-1))
+                    loss = loss_classification
+                elif args.train_mode == 'S':
                     # pdb.set_trace()
                     out, st_map = model(data.x, data.edge_index, data.batch)  ##student model
                     _, te_map = teacher_model(data.x, labs, data.edge_index, data.batch)
@@ -213,7 +223,10 @@ def main():
                     inds = torch.tensor([data.ptr[i + 1] - data.ptr[i] for i in range(data.y.shape[0])]).to(device)
                     labs = torch.repeat_interleave(data.y, inds)
 
-                    if args.train_mode == 'S':
+                    if args.train_mode == 'P':
+                        out, st_map = model(data.x, data.edge_index, data.batch)  ##pure model
+                        loss = nll_loss(out, data.y.view(-1))
+                    elif args.train_mode == 'S':
                         out, st_map = model(data.x, data.edge_index, data.batch)  ##student model
                         _, te_map = teacher_model(data.x, labs, data.edge_index, data.batch)
                         loss_distill = mse_loss(te_map, st_map)
@@ -241,7 +254,7 @@ def main():
                     inds = torch.tensor([data.ptr[i + 1] - data.ptr[i] for i in range(data.y.shape[0])]).to(device)
                     labs = torch.repeat_interleave(data.y, inds)
 
-                    if args.train_mode == 'S':
+                    if args.train_mode == 'S' or args.train_mode == 'P':
                         out, _ = model(data.x, data.edge_index, data.batch)  ##student model
                         loss = nll_loss(out, data.y.view(-1))
 
@@ -276,7 +289,9 @@ def main():
             # Early-Stopping
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                if args.train_mode == 'T':
+                if args.train_mode == 'P':
+                    torch.save(model, f'{checkpoints_path}/{args.dataset}_pure.pth')  #pure model save
+                elif args.train_mode == 'T':
                     torch.save(model, f'{checkpoints_path}/{args.dataset}_teacher.pth')  #teacher model save
                 else:
                     torch.save(model, f'{checkpoints_path}/{args.dataset}_student.pth')  #student model save

@@ -5,8 +5,8 @@ from utils import evaluate_func
 def Test(test_loader, device, args):
     if args.train_mode == 'S':
         model = torch.load(f'{args.checkpoints_path}/{args.dataset}_student.pth').to(device)
-    elif args.train_mode == 'O':
-        model = torch.load(f'{args.checkpoints_path}/{args.dataset}_original.pth').to(device)
+    elif args.train_mode == 'P':
+        model = torch.load(f'{args.checkpoints_path}/{args.dataset}_pure.pth').to(device)
     else:
         model = torch.load(f'{args.checkpoints_path}/{args.dataset}_teacher.pth').to(device)
 
