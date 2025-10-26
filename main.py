@@ -55,7 +55,7 @@ def main():
     parser.add_argument('--early_stop', type=int, default=50,
                         help='early stoping epoches (default:50)')
     parser.add_argument('--train_mode', type=str, default="T",
-                        help='train mode T,S')
+                        help='train mode T,S,P')
     parser.add_argument('--checkpoints_path', type=str, default="checkpoints",
                         help='teacher model save file path')
     parser.add_argument('--result_path', type=str, default="results",
