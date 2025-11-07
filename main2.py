@@ -456,6 +456,11 @@ def main():
         try:
             result_dict = evaluator.eval({"y_true": y_true_all, "y_pred": y_pred_all})
             print("OGB Evaluator Test: {}".format(result_dict))
+            with open(f'{result_path}/{args.dataset}_OGB_result.txt', 'a+') as f:
+                f.write(str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + f" Train Mode: {args.train_mode}")
+                for key, val in result_dict.items():
+                    f.write(f", {key}: {val:.4f}")
+                f.write("\n")
         except:
             print("And error with ogb evaluator has occurred")
             print(evaluator.expected_input_format) 
