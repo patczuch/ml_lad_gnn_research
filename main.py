@@ -2,17 +2,20 @@ import os.path as osp
 import time
 import torch
 import os
-from torch_geometric.datasets import TUDataset
-from torch_geometric.data import DataLoader
 
+from typing import Literal
 from models.base import PureNet
 from models.lad_base import STnet, Tenet
+from torch_geometric.data import DataLoader
 from utils import evaluate_func
 
 import numpy as np
 import datetime
 import random
 import argparse
+
+# Open Graph Benchmark datasets (for graph property prediction, with different scale (small, medium, large) and different domains (molecular, knowledge, etc.)
+OGB_GRAPH_PROPERTY_DATASETS = {'ogbg-molhiv', 'ogbg-molpcba', 'ogbg-ppa', 'ogbg-code2'}     # More info: https://ogb.stanford.edu/docs/graphprop/
 
 
 def main():
@@ -80,8 +83,21 @@ def main():
     if not os.path.exists(result_path):
         os.makedirs(result_path)
 
-    path = osp.join(osp.dirname(osp.realpath(__file__)), './data', args.dataset)
-    dataset = TUDataset(path, name=args.dataset, use_node_attr=True, use_edge_attr=True).shuffle()
+    dataset_type: Literal['ogb-g', 'ogb-n', 'ogb-l', 'torch-dataset'] = ...
+    is_from_ogb = lambda d_type: d_type in {'ogb-g', 'ogb-n', 'ogb-l'}
+
+    # Check dataset parameter (if ogb, and if yes - what type)
+    if args.dataset in OGB_GRAPH_PROPERTY_DATASETS:
+        from ogb.graphproppred import PygGraphPropPredDataset as Dataset, Evaluator
+        dataset_type = 'ogb-g'
+    else:   # Dataset from outside the OGB
+        from torch_geometric.datasets import TUDataset as Dataset
+        dataset_type = 'torch-dataset'
+        path = osp.join(osp.dirname(osp.realpath(__file__)), './data', args.dataset)
+        dataset = Dataset(path, name=args.dataset, use_node_attr=True, use_edge_attr=True).shuffle()
+    
+    if is_from_ogb(dataset_type):
+        dataset = Dataset(name=args.dataset, root='data/').shuffle()
 
     # pdb.set_trace()
 
@@ -100,7 +116,8 @@ def main():
         for graph in dataset:
             x1 = torch.bincount(graph.edge_index[0])
             x1 = (x1 - torch.min(x1)) / (torch.max(x1) - torch.min(x1) + 0.00000001)
-            graph.x = x1.view(-1, 1)
+            # ensure node features are float (torch.bincount produces int tensors)
+            graph.x = x1.view(-1, 1).float()
             graphs.append(graph)
         n = (len(dataset) + 9) // 10
         input_dim = num_features
@@ -144,22 +161,29 @@ def main():
 
     for idd in range(num_k):
         print("=========================" + str(idd + 1) + " on runs " + str(num_k) + "=========================")
-        if x_flag:
-            dataset = dataset.shuffle()
-            test_dataset = dataset[:n]
-            val_dataset = dataset[n:2 * n]
-            train_dataset = dataset[2 * n:]
-            test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True)
-            val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
-            train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        else:
-            random.shuffle(graphs)
-            test_dataset = graphs[:n]
-            val_dataset = graphs[n:2 * n]
-            train_dataset = graphs[2 * n:]
-            test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True)
-            val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
-            train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        if dataset_type == 'ogb-g': #       (ogb)
+            split_idx = dataset.get_idx_split()
+            from torch.utils.data import Subset
+            train_dataset = Subset(dataset, split_idx["train"])
+            val_dataset = Subset(dataset, split_idx["valid"])
+            test_dataset = Subset(dataset, split_idx["test"])
+        else:                       #       (classic from pytorch)
+            if x_flag:
+                dataset = dataset.shuffle()
+                test_dataset = dataset[:n]
+                val_dataset = dataset[n:2 * n]
+                train_dataset = dataset[2 * n:]                
+            else:
+                random.shuffle(graphs)
+                test_dataset = graphs[:n]
+                val_dataset = graphs[n:2 * n]
+                train_dataset = graphs[2 * n:]
+        
+        from torch_geometric.loader import DataLoader
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+
 
         best_val_loss = float('inf')
         best_test_acc = 0.0
@@ -182,6 +206,9 @@ def main():
             for i, data in enumerate(train_loader):
                 s = time.time()
                 data = data.to(device)
+                # ensure node features are float
+                if hasattr(data, 'x') and data.x is not None:
+                    data.x = data.x.float()
                 optimizer.zero_grad()
 
                 inds = torch.tensor([data.ptr[i + 1] - data.ptr[i] for i in range(data.y.shape[0])]).to(device)
@@ -219,6 +246,9 @@ def main():
             with torch.no_grad():
                 for i, data in enumerate(val_loader):
                     data = data.to(device)
+                    # ensure node features are float
+                    if hasattr(data, 'x') and data.x is not None:
+                        data.x = data.x.float()
 
                     inds = torch.tensor([data.ptr[i + 1] - data.ptr[i] for i in range(data.y.shape[0])]).to(device)
                     labs = torch.repeat_interleave(data.y, inds)
@@ -251,6 +281,9 @@ def main():
             with torch.no_grad():
                 for i, data in enumerate(test_loader):
                     data = data.to(device)
+                    # ensure node features are float
+                    if hasattr(data, 'x') and data.x is not None:
+                        data.x = data.x.float()
                     inds = torch.tensor([data.ptr[i + 1] - data.ptr[i] for i in range(data.y.shape[0])]).to(device)
                     labs = torch.repeat_interleave(data.y, inds)
 
@@ -316,11 +349,37 @@ def main():
     print("test_avg_acc: {:.5f}, test_std_acc: {:.5f}, AUC: {:.5f}, f1: {:.5f}".format(test_avg, test_std, max(auc_all),
                                                                                        max(f1_all)))
 
-    with open(f'{result_path}/{args.dataset}_ACC_result.txt', 'a+') as f:
-        f.write(str(datetime.datetime.now().strftime(
-            '%Y-%m-%d %H:%M:%S')) + f" Train Mode: {args.train_mode} test_avg_acc: {test_avg:.4f}, test_std_acc: {test_std:.4f}, AUC: {max(auc_all):.4f}, F1: {max(f1_all):.4f}")
-        f.write("\n")
+    if not is_from_ogb(dataset_type):
+        with open(f'{result_path}/{args.dataset}_ACC_result.txt', 'a+') as f:
+            f.write(str(datetime.datetime.now().strftime(
+                '%Y-%m-%d %H:%M:%S')) + f" Train Mode: {args.train_mode} test_avg_acc: {test_avg:.4f}, test_std_acc: {test_std:.4f}, AUC: {max(auc_all):.4f}, F1: {max(f1_all):.4f}")
+            f.write("\n")
+    
+    if is_from_ogb(dataset_type):
+        evaluator = Evaluator(name=args.dataset)
+        # print(len(y_tures), y_tures[0].shape)
+        # print(len(y_preds), y_preds[0].shape)
 
+        if dataset_type == 'ogb-g':
+            y_true_all = np.concatenate(y_tures, axis=0).reshape(-1, 1)
+
+            y_pred_all = np.concatenate(y_preds, axis=0)
+            if y_pred_all.shape[1] == 2:
+                y_pred_all = y_pred_all[:, 1].reshape(-1, 1)
+            else:
+                y_pred_all = y_pred_all.reshape(-1, 1)
+        try:
+            result_dict = evaluator.eval({"y_true": y_true_all, "y_pred": y_pred_all})
+            print("OGB Evaluator Test: {}".format(result_dict))
+            with open(f'{result_path}/{args.dataset}_OGB_result.txt', 'a+') as f:
+                f.write(str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + f" Train Mode: {args.train_mode}")
+                for key, val in result_dict.items():
+                    f.write(f", {key}: {val:.4f}")
+                f.write("\n")
+        except:
+            print("And error with ogb evaluator has occurred")
+            print(evaluator.expected_input_format) 
+            print(evaluator.expected_output_format)
 
 if __name__ == '__main__':
     main()
