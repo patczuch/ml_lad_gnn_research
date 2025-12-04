@@ -1,0 +1,3 @@
+2025-12-04 14:09:05 Train Mode: T test_avg_acc: 0.9320, test_std_acc: 0.0000, AUC: 0.0000, F1: 0.9355, ECE: 0.0936, Brier: 0.1579
+2025-12-04 14:11:31 Train Mode: S test_avg_acc: 0.6980, test_std_acc: 0.0000, AUC: 0.0000, F1: 0.6987, ECE: 0.0342, Brier: 0.4035
+2025-12-04 14:11:57 Train Mode: P test_avg_acc: 0.6820, test_std_acc: 0.0000, AUC: 0.0000, F1: 0.6688, ECE: 0.0405, Brier: 0.4318

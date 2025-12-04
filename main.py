@@ -18,6 +18,37 @@ import argparse
 OGB_GRAPH_PROPERTY_DATASETS = {'ogbg-molhiv', 'ogbg-molpcba', 'ogbg-ppa', 'ogbg-code2'}     # More info: https://ogb.stanford.edu/docs/graphprop/
 
 
+def compute_ece(probs: np.ndarray, labels: np.ndarray, n_bins: int):
+    confidences = np.max(probs, axis=1)
+    preds = np.argmax(probs, axis=1)
+    accuracies = (preds == labels).astype(float)
+
+    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    bin_accs = np.zeros(n_bins)
+    bin_confs = np.zeros(n_bins)
+    bin_counts = np.zeros(n_bins, dtype=int)
+    ece = 0.0
+    for i in range(n_bins):
+        mask = (confidences > bins[i]) & (confidences <= bins[i+1]) if i < n_bins - 1 else (confidences > bins[i]) & (confidences <= bins[i+1])
+        bin_count = np.sum(mask)
+        bin_counts[i] = int(bin_count)
+        if bin_count > 0:
+            bin_acc = np.mean(accuracies[mask])
+            bin_conf = np.mean(confidences[mask])
+            bin_accs[i] = bin_acc
+            bin_confs[i] = bin_conf
+            ece += (bin_count / len(probs)) * abs(bin_conf - bin_acc)
+    return ece
+
+
+def compute_brier(probs: np.ndarray, labels: np.ndarray):
+    one_hot = np.zeros_like(probs)
+    one_hot[np.arange(len(labels)), labels.astype(int)] = 1.0
+    sq = (probs - one_hot) ** 2
+    sample_brier = np.sum(sq, axis=1)
+    return float(np.mean(sample_brier))
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='PyTorch graph convolutional neural net for whole-graph classification')
@@ -55,8 +86,8 @@ def main():
                         help='the weight of distill loss(default: 0.1)')
     parser.add_argument('--tau', type=float, default=0.1,
                         help='linear attention temprature(default: 0.1)')
-    parser.add_argument('--early_stop', type=int, default=8,
-                        help='early stoping epoches (default:8)')
+    parser.add_argument('--early_stop', type=int, default=7,
+                        help='early stoping epoches (default:7)')
     parser.add_argument('--train_mode', type=str, default="T",
                         help='train mode T,S,P')
     parser.add_argument('--checkpoints_path', type=str, default="checkpoints",
@@ -97,7 +128,15 @@ def main():
         dataset = Dataset(path, name=args.dataset, use_node_attr=True, use_edge_attr=True).shuffle()
     
     if is_from_ogb(dataset_type):
-        dataset = Dataset(name=args.dataset, root='data/').shuffle()
+        try:
+            from torch_geometric.data.data import DataEdgeAttr, Data, DataTensorAttr
+            from torch_geometric.data.storage import GlobalStorage
+            safe_globals = torch.serialization.safe_globals
+        except Exception:
+            dataset = Dataset(name=args.dataset, root='data/').shuffle()
+        else:
+            with safe_globals([DataEdgeAttr, Data, DataTensorAttr, GlobalStorage]):
+                dataset = Dataset(name=args.dataset, root='data/').shuffle()
 
     print(f"Dataset: {args.dataset}, Type: {dataset_type}, Number of graphs: {len(dataset)}")
     
@@ -154,6 +193,7 @@ def main():
     mse_loss = torch.nn.MSELoss()
     test_acc_all = []
     auc_all, f1_all = [], []
+    ece_all, brier_all = [], []
 
     if args.train_mode == 'S':
         num_k = args.runs
@@ -190,6 +230,7 @@ def main():
         best_test_acc = 0.0
         wait = None
         best_test_acc, best_auc, best_f1 = 0.0, 0.0, 0.0
+        best_ece, best_brier = 1.0, 1.0
 
         # model training
         for epoch in range(args.epochs):
@@ -304,7 +345,8 @@ def main():
                         out, _ = model(data.x, labs, data.edge_index, data.batch)  ##teacher model input
                         loss = nll_loss(out, data.y.view(-1))
 
-                    y_preds.append(out.cpu().numpy())
+                    probs = torch.softmax(out, dim=1).cpu().numpy()
+                    y_preds.append(probs)
                     y_tures.append(data.y.view(-1).cpu().numpy())
 
                     test_loss += loss.item()
@@ -314,10 +356,25 @@ def main():
             test_acc = test_corrects / len(test_dataset)
             auc, f1 = evaluate_func(y_preds, y_tures, args.dataset)
 
+            try:
+                y_pred_all = np.concatenate(y_preds, axis=0)
+                y_true_all = np.concatenate(y_tures, axis=0).astype(int)
+                if y_pred_all.ndim == 1:
+                    y_pred_all = y_pred_all.reshape(-1, 1)
+                n_test = len(y_true_all)
+                n_bins = int(np.clip(np.sqrt(n_test), 5, 50))
+                ece_val = compute_ece(y_pred_all, y_true_all, n_bins=n_bins)
+                brier_val = compute_brier(y_pred_all, y_true_all)
+            except Exception:
+                ece_val, brier_val = float('nan'), float('nan')
+
             log = '[*] Epoch: {}, Train Loss: {:.3f}, Train Acc: {:.2f}, Val Loss: {:.3f}, ' \
-                  'Val Acc: {:.2f}, Test Loss: {:.3f}, Test Acc: {:.2f}, AUC:{:.3f}, F1:{:.3f}' \
-                .format(epoch, train_loss, train_acc, val_loss, val_acc, test_loss, test_acc, auc, f1)
+                  'Val Acc: {:.2f}, Test Loss: {:.3f}, Test Acc: {:.2f}, AUC:{:.3f}, F1:{:.3f}, ECE:{:.4f}, Brier:{:.4f}' \
+                .format(epoch, train_loss, train_acc, val_loss, val_acc, test_loss, test_acc, auc, f1, ece_val, brier_val)
             print(log)
+
+            if not np.isnan(ece_val) and ece_val < best_ece:
+                best_ece = ece_val
 
             if best_test_acc < test_acc:
                 best_test_acc = test_acc
@@ -327,6 +384,10 @@ def main():
 
             if best_f1 < f1:
                 best_f1 = f1
+
+            if not np.isnan(brier_val) and best_brier > brier_val:
+                best_brier = brier_val
+
 
             # Early-Stopping
             if val_loss < best_val_loss:
@@ -349,25 +410,38 @@ def main():
         test_acc_all.append(best_test_acc)
         auc_all.append(best_auc)
         f1_all.append(best_f1)
+        ece_all.append(best_ece)
+        brier_all.append(best_brier)
 
     # pdb.set_trace()
     top_acc = np.asarray(test_acc_all)
     test_avg = np.mean(top_acc)
     test_std = np.std(top_acc)
 
-    print("test_avg_acc: {:.5f}, test_std_acc: {:.5f}, AUC: {:.5f}, f1: {:.5f}".format(test_avg, test_std, max(auc_all),
-                                                                                       max(f1_all)))
+    print("test_avg_acc: {:.5f}, test_std_acc: {:.5f}, AUC: {:.5f}, f1: {:.5f}, ECE: {:.5f}, Brier: {:.5f}".format(
+        test_avg, test_std, max(auc_all) if auc_all else float('nan'), max(f1_all) if f1_all else float('nan'),
+        min(ece_all) if ece_all else float('nan'), min(brier_all) if brier_all else float('nan')))
 
     if not is_from_ogb(dataset_type):
+        # delete file if args.train_mode == T
+        if args.train_mode == 'T':
+            if os.path.exists(f'{result_path}/{args.dataset}_ACC_result.txt'):
+                os.remove(f'{result_path}/{args.dataset}_ACC_result.txt')
+
         with open(f'{result_path}/{args.dataset}_ACC_result.txt', 'a+') as f:
             f.write(str(datetime.datetime.now().strftime(
-                '%Y-%m-%d %H:%M:%S')) + f" Train Mode: {args.train_mode} test_avg_acc: {test_avg:.4f}, test_std_acc: {test_std:.4f}, AUC: {max(auc_all):.4f}, F1: {max(f1_all):.4f}")
+                '%Y-%m-%d %H:%M:%S')) + f" Train Mode: {args.train_mode} test_avg_acc: {test_avg:.4f}, test_std_acc: {test_std:.4f}, AUC: {max(auc_all) if auc_all else float('nan'):.4f}, F1: {max(f1_all) if f1_all else float('nan'):.4f}, ECE: {min(ece_all) if ece_all else float('nan'):.4f}, Brier: {min(brier_all) if brier_all else float('nan'):.4f}")
             f.write("\n")
     
     if is_from_ogb(dataset_type):
         evaluator = Evaluator(name=args.dataset)
         # print(len(y_tures), y_tures[0].shape)
         # print(len(y_preds), y_preds[0].shape)
+
+        # delete file if args.train_mode == T
+        if args.train_mode == 'T':
+            if os.path.exists(f'{result_path}/{args.dataset}_OGB_result.txt'):
+                os.remove(f'{result_path}/{args.dataset}_OGB_result.txt')
 
         if dataset_type == 'ogb-g':
             y_true_all = np.concatenate(y_tures, axis=0).reshape(-1, 1)
@@ -384,6 +458,7 @@ def main():
                 f.write(str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + f" Train Mode: {args.train_mode}")
                 for key, val in result_dict.items():
                     f.write(f", {key}: {val:.4f}")
+                f.write(f", ECE: {min(ece_all) if ece_all else float('nan'):.4f}, Brier: {min(brier_all) if brier_all else float('nan'):.4f}")
                 f.write("\n")
         except:
             print("And error with ogb evaluator has occurred")

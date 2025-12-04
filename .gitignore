@@ -1,5 +1,6 @@
-data/*
+data/
 checkpoints/
+scripts/data/
 
 __pycache__/
 models/__pycache__/
