@@ -55,8 +55,8 @@ def main():
                         help='the weight of distill loss(default: 0.1)')
     parser.add_argument('--tau', type=float, default=0.1,
                         help='linear attention temprature(default: 0.1)')
-    parser.add_argument('--early_stop', type=int, default=50,
-                        help='early stoping epoches (default:50)')
+    parser.add_argument('--early_stop', type=int, default=8,
+                        help='early stoping epoches (default:8)')
     parser.add_argument('--train_mode', type=str, default="T",
                         help='train mode T,S,P')
     parser.add_argument('--checkpoints_path', type=str, default="checkpoints",
