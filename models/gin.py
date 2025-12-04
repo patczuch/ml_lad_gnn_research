@@ -51,8 +51,8 @@ class GIN(nn.Module):
                 x = F.relu(x)
                 x = F.dropout(x, p=self.dropout, training=self.training)
 
-            x = self.gin_layers[-1](x, edge_index)
-            return x
+            # x = self.gin_layers[-1](x, edge_index)
+        return x
 
     def initialize(self):
         for m in self.gin_layers:
