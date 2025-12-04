@@ -4,6 +4,7 @@ from torch_geometric.nn import global_mean_pool
 from .gcn import GCN
 from .gat import GAT
 from .gin import GIN
+from .graph_sage import GraphSAGE
 
 
 class PureNet(torch.nn.Module):
@@ -16,6 +17,8 @@ class PureNet(torch.nn.Module):
             self.gnn_model = GAT(nfeat, nhid, nhid, nlayers, gat_heads, 1, dropout, with_bn)
         elif gnn == "GIN":
             self.gnn_model = GIN(nfeat, nhid, nhid, nlayers, dropout, with_bias, with_bn)
+        elif gnn == "GraphSAGE":
+            self.gnn_model = GraphSAGE(nfeat, nhid, nhid, nlayers, dropout, with_bias, with_bn)
         else:
             raise Exception("gnn mode error!")
         self.cls = torch.nn.Linear(nhid, nclass)

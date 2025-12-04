@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from .gcn import GCN
 from .gat import GAT
 from .gin import GIN
+from .graph_sage import GraphSAGE
 
 
 class Classifier(nn.Module):
@@ -88,6 +89,8 @@ class STnet(nn.Module):
             self.gnn_model = GAT(nfeat, nhid, nhid, nlayers, gat_heads, 1, dropout, with_bn)
         elif gnn == "GIN":
             self.gnn_model = GIN(nfeat, nhid, nhid, nlayers, dropout, with_bias, with_bn)
+        elif gnn == "GraphSAGE":
+            self.gnn_model = GraphSAGE(nfeat, nhid, nhid, nlayers, dropout, with_bias, with_bn)
         else:
             raise Exception("gnn mode error!")
 
@@ -156,6 +159,8 @@ class Tenet(nn.Module):
             self.gnn_model = GAT(nfeat, nhid, nhid, nlayers, gat_heads, 1, dropout, with_bn)
         elif gnn == "GIN":
             self.gnn_model = GIN(nfeat, nhid, nhid, nlayers, dropout, with_bias, with_bn)
+        elif gnn == "GraphSAGE":
+            self.gnn_model = GraphSAGE(nfeat, nhid, nhid, nlayers, dropout, with_bias, with_bn)
         else:
             raise Exception("gnn mode error!")
 

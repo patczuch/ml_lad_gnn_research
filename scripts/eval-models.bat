@@ -16,7 +16,7 @@ if not "%2"=="" (
     )
 )
 
-set BACKBONES=GAT GCN GIN
+set BACKBONES=GAT GCN GIN GraphSAGE
 set MODES=T S P
 
 for %%B in (%BACKBONES%) do (

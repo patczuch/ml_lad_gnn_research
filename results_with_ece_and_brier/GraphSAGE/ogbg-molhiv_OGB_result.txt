@@ -1,0 +1,3 @@
+2025-12-04 18:59:10 Train Mode: T, rocauc: 1.0000, ECE: 0.0000, Brier: 0.0000
+2025-12-04 19:30:29 Train Mode: S, rocauc: 0.7890, ECE: 0.0086, Brier: 0.0598
+2025-12-04 19:34:55 Train Mode: P, rocauc: 0.7426, ECE: 0.0066, Brier: 0.0679
