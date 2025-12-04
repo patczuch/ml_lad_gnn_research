@@ -25,9 +25,10 @@ for %%B in (%BACKBONES%) do (
         echo Starting: backbone=%%B ^| train_mode=%%M
         echo ---------------------------------------
 
-        python main.py --dataset %DATASET% --backbone %%B --train_mode %%M %EXTRA%
+        python ..\main.py --dataset %DATASET% --backbone %%B --train_mode %%M %EXTRA%
         )
     )
-)
 
 endlocal
+
+echo Done

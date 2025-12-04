@@ -99,6 +99,8 @@ def main():
     if is_from_ogb(dataset_type):
         dataset = Dataset(name=args.dataset, root='data/').shuffle()
 
+    print(f"Dataset: {args.dataset}, Type: {dataset_type}, Number of graphs: {len(dataset)}")
+    
     # pdb.set_trace()
 
     ##graph features process
@@ -146,8 +148,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
                                                            patience=args.scheduler_patience,
-                                                           factor=args.scheduler_factor,
-                                                           verbose=True)
+                                                           factor=args.scheduler_factor)
 
     nll_loss = torch.nn.NLLLoss()
     mse_loss = torch.nn.MSELoss()
@@ -199,8 +200,16 @@ def main():
             model.train()
 
             if args.train_mode == 'S':
-                # load teacher model
-                teacher_model = torch.load(f'{checkpoints_path}/{args.dataset}_teacher.pth').to(device)
+                # load teacher model (safe unpickling on PyTorch >=2.6)
+                # Prefer using the safe_globals context manager to allowlist custom classes
+                try:
+                    safe_globals = torch.serialization.safe_globals
+                except Exception:
+                    # fallback: try loading with weights_only=False (use only if you trust the file)
+                    teacher_model = torch.load(f'{checkpoints_path}/{args.dataset}_teacher.pth', weights_only=False).to(device)
+                else:
+                    with safe_globals([STnet, Tenet, PureNet]):
+                        teacher_model = torch.load(f'{checkpoints_path}/{args.dataset}_teacher.pth', weights_only=False).to(device)
                 teacher_model.eval()
 
             for i, data in enumerate(train_loader):
