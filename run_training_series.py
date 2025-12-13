@@ -4,6 +4,58 @@ import sys
 import random
 from datetime import datetime
 
+"""
+hyperparams for MUTAG, PROTEINS, COLLAB, IMDB-BINARY, IMDB-MULTI:
+batch_size = 32
+nhid = 64
+nlayers = 2
+gat_heads = 4
+epochs = 500
+learning rate = 0.001
+dropout = 0.5
+with_bn = true
+with_bias = true
+weight_decay = 5e-5
+scheduler_patience = 50
+scheduler_factor = 0.1
+alpha = 1.0
+tau = 0.1
+early_stop = 7
+
+hyperparams for REDDIT-BINARY
+batch_size = 8
+nhid = 64
+nlayers = 2
+gat_heads = 2
+epochs = 500
+learning rate = 0.001
+dropout = 0.5
+with_bn = false
+with_bias = true
+weight_decay = 5e-4
+scheduler_patience = 10
+scheduler_factor = 0.5
+alpha = 0.3
+tau = 0.3
+early_stop = 15
+
+hyperparams for ogbg-molhiv
+batch_size = 256
+nhid = 128
+nlayers = 4
+gat_heads = 4
+epochs = 500
+learning rate = 0.001
+dropout = 0.2
+with_bn = true
+with_bias = true
+weight_decay = 1e-3
+scheduler_patience = 10
+scheduler_factor = 0.5
+alpha = 0.3
+tau = 0.3
+early_stop = 25
+"""
 
 # MUTAG, PROTEINS, COLLAB, IMDB-BINARY, IMDB-MULTI, REDDIT-BINARY, ogbg-molhiv
 
