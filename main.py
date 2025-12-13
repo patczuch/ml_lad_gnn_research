@@ -66,8 +66,8 @@ def main():
                         help='gnn layer numbers (default: 2)')
     parser.add_argument('--gat_heads', type=int, default=4,
                         help='gat heads num (default: 4)')
-    parser.add_argument('--epochs', type=int, default=300,
-                        help='number of epochs to train (default: 300)')
+    parser.add_argument('--epochs', type=int, default=500,
+                        help='number of epochs to train (default: 500)')
     parser.add_argument('--lr', type=float, default=0.001,
                         help='learning rate (default: 0.001)')
     parser.add_argument('--dropout', type=float, default=0.5,
@@ -97,6 +97,10 @@ def main():
     parser.add_argument('--backbone', type=str, default="GCN",
                         help='backbone models: GAT, GCN, GIN')
     parser.add_argument('--runs', type=int, default=1, help='ten-fold cross validation')
+    parser.add_argument('--summary_csv', type=str, default=osp.join('results', 'summary.csv'),
+                        help='Path to the global summary CSV (semicolon separated)')
+    parser.add_argument('--epoch_logs_dir', type=str, default=osp.join('results', 'epoch_logs'),
+                        help='Directory to store per-epoch logs')
     args = parser.parse_args()
 
     #set up seeds and gpu device
@@ -108,6 +112,9 @@ def main():
 
     checkpoints_path = f'{args.checkpoints_path}/{args.backbone}'
     result_path = f'{args.result_path}/{args.backbone}'
+    # ensure extra results dirs
+    os.makedirs(osp.dirname(args.summary_csv), exist_ok=True)
+    os.makedirs(args.epoch_logs_dir, exist_ok=True)
 
     if not os.path.exists(checkpoints_path):
         os.makedirs(checkpoints_path, exist_ok=True)
@@ -232,7 +239,23 @@ def main():
         best_test_acc, best_auc, best_f1 = 0.0, 0.0, 0.0
         best_ece, best_brier = 1.0, 1.0
 
+        # prepare per-epoch log file (one file per training)
+        ts = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+        log_dir = osp.join(args.epoch_logs_dir, str(args.backbone))
+        os.makedirs(log_dir, exist_ok=True)
+        epoch_log_path = osp.join(
+            log_dir,
+            f"{args.dataset}_{args.backbone}_{args.train_mode}_{ts}.csv"
+        )
+        with open(epoch_log_path, 'w', encoding='utf-8') as ef:
+            # header metadata
+            ef.write(f"# dataset: {args.dataset}\n")
+            ef.write(f"# type: {args.backbone}\n")
+            ef.write(f"# train_mode: {args.train_mode}\n")
+            ef.write(f"epoch;train_loss;train_acc;val_loss;val_acc;test_loss;test_acc;AUC;F1;ECE;Brier\n")
+
         # model training
+        epochs_run = 0
         for epoch in range(args.epochs):
             # Training the model
             s_time = time.time()
@@ -373,6 +396,12 @@ def main():
                 .format(epoch, train_loss, train_acc, val_loss, val_acc, test_loss, test_acc, auc, f1, ece_val, brier_val)
             print(log)
 
+            # append to per-epoch log
+            with open(epoch_log_path, 'a', encoding='utf-8') as ef:
+                ef.write(
+                    f"{epoch};{train_loss:.6f};{train_acc:.6f};{val_loss:.6f};{val_acc:.6f};{test_loss:.6f};{test_acc:.6f};{auc:.6f};{f1:.6f};{(ece_val if not np.isnan(ece_val) else float('nan')):.6f};{(brier_val if not np.isnan(brier_val) else float('nan')):.6f}\n"
+                )
+
             if not np.isnan(ece_val) and ece_val < best_ece:
                 best_ece = ece_val
 
@@ -405,7 +434,9 @@ def main():
             if wait == args.early_stop:
                 print('======== Early stopping! ========')
                 # saving the model with best validation loss
+                epochs_run = epoch + 1
                 break
+            epochs_run = epoch + 1
 
         test_acc_all.append(best_test_acc)
         auc_all.append(best_auc)
@@ -427,11 +458,35 @@ def main():
         if args.train_mode == 'T':
             if os.path.exists(f'{result_path}/{args.dataset}_ACC_result.txt'):
                 os.remove(f'{result_path}/{args.dataset}_ACC_result.txt')
+    #
+    #     with open(f'{result_path}/{args.dataset}_ACC_result.txt', 'a+') as f:
+    #         f.write(str(datetime.datetime.now().strftime(
+    #             '%Y-%m-%d %H:%M:%S')) + f" Train Mode: {args.train_mode} test_avg_acc: {test_avg:.4f}, test_std_acc: {test_std:.4f}, AUC: {max(auc_all) if auc_all else float('nan'):.4f}, F1: {max(f1_all) if f1_all else float('nan'):.4f}, ECE: {min(ece_all) if ece_all else float('nan'):.4f}, Brier: {min(brier_all) if brier_all else float('nan'):.4f}")
+    #         f.write("\n")
 
-        with open(f'{result_path}/{args.dataset}_ACC_result.txt', 'a+') as f:
-            f.write(str(datetime.datetime.now().strftime(
-                '%Y-%m-%d %H:%M:%S')) + f" Train Mode: {args.train_mode} test_avg_acc: {test_avg:.4f}, test_std_acc: {test_std:.4f}, AUC: {max(auc_all) if auc_all else float('nan'):.4f}, F1: {max(f1_all) if f1_all else float('nan'):.4f}, ECE: {min(ece_all) if ece_all else float('nan'):.4f}, Brier: {min(brier_all) if brier_all else float('nan'):.4f}")
-            f.write("\n")
+    # Append to global summary CSV (semicolon separated)
+    try:
+        header = "dataset;type;train_mode;test_avg_acc;test_std_acc;AUC;F1;ECE;Brier;num_epochs\n"
+        row = ";".join([
+            str(args.dataset),
+            str(args.backbone),
+            str(args.train_mode),
+            f"{test_avg:.6f}",
+            f"{test_std:.6f}",
+            f"{(max(auc_all) if auc_all else float('nan')):.6f}",
+            f"{(max(f1_all) if f1_all else float('nan')):.6f}",
+            f"{(min(ece_all) if ece_all else float('nan')):.6f}",
+            f"{(min(brier_all) if brier_all else float('nan')):.6f}",
+            str(epochs_run if 'epochs_run' in locals() and epochs_run else args.epochs)
+        ]) + "\n"
+        # create file if not exists with header
+        write_header = not os.path.exists(args.summary_csv) or os.path.getsize(args.summary_csv) == 0
+        with open(args.summary_csv, 'a', encoding='utf-8') as sf:
+            if write_header:
+                sf.write(header)
+            sf.write(row)
+    except Exception as e:
+        print(f"[WARN] Failed to append to summary CSV: {e}")
     
     if is_from_ogb(dataset_type):
         evaluator = Evaluator(name=args.dataset)
