@@ -21,6 +21,7 @@ scheduler_factor = 0.1
 alpha = 1.0
 tau = 0.1
 early_stop = 7
+python ./run_training_series.py --dataset X
 
 hyperparams for REDDIT-BINARY
 batch_size = 8
@@ -38,6 +39,7 @@ scheduler_factor = 0.5
 alpha = 0.3
 tau = 0.3
 early_stop = 15
+python ./run_training_series.py --dataset REDDIT-BINARY --batch_size=8 --nhid=64 --gat_heads=2 --lr=0.001 --with_bn=false --weight_decay=5e-4 --scheduler_patience=10 --scheduler_factor=0.5 --alpha=0.3 --tau=0.3 --early_stop=15
 
 hyperparams for ogbg-molhiv
 batch_size = 256
@@ -55,6 +57,7 @@ scheduler_factor = 0.5
 alpha = 0.3
 tau = 0.3
 early_stop = 25
+python ./run_training_series.py --dataset ogbg-molhiv --batch_size=256 --nhid=128 --gat_heads=4 --lr=0.001 --weight_decay=1e-3 --scheduler_patience=10 --scheduler_factor=0.5 --alpha=0.3 --tau=0.3 --early_stop=25
 """
 
 # MUTAG, PROTEINS, COLLAB, IMDB-BINARY, IMDB-MULTI, REDDIT-BINARY, ogbg-molhiv
@@ -80,6 +83,16 @@ def main():
     parser.add_argument('--python', type=str, default=sys.executable, help='Python executable to use')
     parser.add_argument('--extra', type=str, nargs=argparse.REMAINDER, default=[],
                         help='Any extra args to pass to main.py (put them after --)')
+    parser.add_argument('--lr', type=float, default=0.001,
+                        help='learning rate (default: 0.001)')
+    parser.add_argument('--with_bn', type=bool, default=True,
+                        help='if with bn (default: True)')
+    parser.add_argument('--with_bias', type=bool, default=True,
+                        help='if with bias (default: True)')
+    parser.add_argument('--scheduler_patience', type=int, default=50,
+                        help='scheduler patience (default: 50)')
+    parser.add_argument('--scheduler_factor', type=float, default=0.1,
+                        help='scheduler factor (default: 0.1)')
 
     args = parser.parse_args()
 
@@ -117,6 +130,11 @@ def main():
                     '--train_mode', mode,
                     '--backbone', backbone,
                     '--seed', str(seed),
+                    '--lr', str(args.lr),
+                    '--with_bn', str(args.with_bn),
+                    '--with_bias', str(args.with_bias),
+                    '--scheduler_patience', str(args.scheduler_patience),
+                    '--scheduler_factor', str(args.scheduler_factor),
                     '--runs', '1'  # ensure single training per configuration
                 ]
                 if args.extra:

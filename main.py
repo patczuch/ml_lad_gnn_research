@@ -467,13 +467,50 @@ def main():
     # Append to global summary CSV (semicolon separated)
     try:
         header = "dataset;type;train_mode;test_avg_acc;test_std_acc;AUC;F1;ECE;Brier;num_epochs\n"
+
+        result_dict = {}
+        if is_from_ogb(dataset_type):
+            evaluator = Evaluator(name=args.dataset)
+            # print(len(y_tures), y_tures[0].shape)
+            # print(len(y_preds), y_preds[0].shape)
+
+            # delete file if args.train_mode == T
+            if args.train_mode == 'T':
+                if os.path.exists(f'{result_path}/{args.dataset}_OGB_result.txt'):
+                    os.remove(f'{result_path}/{args.dataset}_OGB_result.txt')
+
+            if dataset_type == 'ogb-g':
+                y_true_all = np.concatenate(y_tures, axis=0).reshape(-1, 1)
+
+                y_pred_all = np.concatenate(y_preds, axis=0)
+                if y_pred_all.shape[1] == 2:
+                    y_pred_all = y_pred_all[:, 1].reshape(-1, 1)
+                else:
+                    y_pred_all = y_pred_all.reshape(-1, 1)
+            result_dict = evaluator.eval({"y_true": y_true_all, "y_pred": y_pred_all})
+            # try:
+            #     result_dict = evaluator.eval({"y_true": y_true_all, "y_pred": y_pred_all})
+            #     print("OGB Evaluator Test: {}".format(result_dict))
+            #     with open(f'{result_path}/{args.dataset}_OGB_result.txt', 'a+') as f:
+            #         f.write(
+            #             str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + f" Train Mode: {args.train_mode}")
+            #         for key, val in result_dict.items():
+            #             f.write(f", {key}: {val:.4f}")
+            #         f.write(
+            #             f", ECE: {min(ece_all) if ece_all else float('nan'):.4f}, Brier: {min(brier_all) if brier_all else float('nan'):.4f}")
+            #         f.write("\n")
+            # except:
+            #     print("And error with ogb evaluator has occurred")
+            #     print(evaluator.expected_input_format)
+            #     print(evaluator.expected_output_format)
+
         row = ";".join([
             str(args.dataset),
             str(args.backbone),
             str(args.train_mode),
             f"{test_avg:.6f}",
             f"{test_std:.6f}",
-            f"{(max(auc_all) if auc_all else float('nan')):.6f}",
+            f"{(result_dict['rocauc'] if is_from_ogb(dataset_type) else (max(auc_all) if auc_all else float('nan'))):.6f}",
             f"{(max(f1_all) if f1_all else float('nan')):.6f}",
             f"{(min(ece_all) if ece_all else float('nan')):.6f}",
             f"{(min(brier_all) if brier_all else float('nan')):.6f}",
@@ -487,38 +524,6 @@ def main():
             sf.write(row)
     except Exception as e:
         print(f"[WARN] Failed to append to summary CSV: {e}")
-    
-    if is_from_ogb(dataset_type):
-        evaluator = Evaluator(name=args.dataset)
-        # print(len(y_tures), y_tures[0].shape)
-        # print(len(y_preds), y_preds[0].shape)
-
-        # delete file if args.train_mode == T
-        if args.train_mode == 'T':
-            if os.path.exists(f'{result_path}/{args.dataset}_OGB_result.txt'):
-                os.remove(f'{result_path}/{args.dataset}_OGB_result.txt')
-
-        if dataset_type == 'ogb-g':
-            y_true_all = np.concatenate(y_tures, axis=0).reshape(-1, 1)
-
-            y_pred_all = np.concatenate(y_preds, axis=0)
-            if y_pred_all.shape[1] == 2:
-                y_pred_all = y_pred_all[:, 1].reshape(-1, 1)
-            else:
-                y_pred_all = y_pred_all.reshape(-1, 1)
-        try:
-            result_dict = evaluator.eval({"y_true": y_true_all, "y_pred": y_pred_all})
-            print("OGB Evaluator Test: {}".format(result_dict))
-            with open(f'{result_path}/{args.dataset}_OGB_result.txt', 'a+') as f:
-                f.write(str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + f" Train Mode: {args.train_mode}")
-                for key, val in result_dict.items():
-                    f.write(f", {key}: {val:.4f}")
-                f.write(f", ECE: {min(ece_all) if ece_all else float('nan'):.4f}, Brier: {min(brier_all) if brier_all else float('nan'):.4f}")
-                f.write("\n")
-        except:
-            print("And error with ogb evaluator has occurred")
-            print(evaluator.expected_input_format) 
-            print(evaluator.expected_output_format)
 
 if __name__ == '__main__':
     main()
