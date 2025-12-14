@@ -24,7 +24,7 @@ early_stop = 7
 python ./run_training_series.py --dataset X
 
 hyperparams for REDDIT-BINARY
-batch_size = 8
+batch_size = 32
 nhid = 64
 nlayers = 2
 gat_heads = 2
@@ -36,10 +36,10 @@ with_bias = true
 weight_decay = 5e-4
 scheduler_patience = 10
 scheduler_factor = 0.5
-alpha = 0.3
-tau = 0.3
-early_stop = 15
-python ./run_training_series.py --dataset REDDIT-BINARY --batch_size=8 --nhid=64 --gat_heads=2 --lr=0.001 --with_bn=false --weight_decay=5e-4 --scheduler_patience=10 --scheduler_factor=0.5 --alpha=0.3 --tau=0.3 --early_stop=15
+alpha = 1.0
+tau = 0.1                                         
+early_stop = 7
+python ./run_training_series.py --dataset REDDIT-BINARY --batch_size=32 --nhid=64 --gat_heads=2 --lr=0.001 --with_bn=false --weight_decay=5e-4 --scheduler_patience=10 --scheduler_factor=0.5 --alpha=1.0 --tau=0.1 --early_stop=7
 
 hyperparams for ogbg-molhiv
 batch_size = 256
