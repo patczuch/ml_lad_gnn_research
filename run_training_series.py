@@ -43,7 +43,7 @@ python ./run_training_series.py --dataset REDDIT-BINARY --batch_size=32 --nhid=6
 
 hyperparams for ogbg-molhiv
 batch_size = 256
-nhid = 128
+nhid = 96
 nlayers = 4
 gat_heads = 4
 epochs = 500
@@ -54,10 +54,10 @@ with_bias = true
 weight_decay = 1e-3
 scheduler_patience = 10
 scheduler_factor = 0.5
-alpha = 0.3
-tau = 0.3
-early_stop = 25
-python ./run_training_series.py --dataset ogbg-molhiv --batch_size=256 --nhid=128 --gat_heads=4 --lr=0.001 --weight_decay=1e-3 --scheduler_patience=10 --scheduler_factor=0.5 --alpha=0.3 --tau=0.3 --early_stop=25
+alpha = 1.0
+tau = 0.1
+early_stop = 7
+python ./run_training_series.py --dataset ogbg-molhiv --batch_size=256 --nhid=96 --gat_heads=4 --lr=0.001 --weight_decay=1e-3 --scheduler_patience=10 --scheduler_factor=0.5 --alpha=1.0 --tau=0.1 --early_stop=7
 """
 
 # MUTAG, PROTEINS, COLLAB, IMDB-BINARY, IMDB-MULTI, REDDIT-BINARY, ogbg-molhiv
