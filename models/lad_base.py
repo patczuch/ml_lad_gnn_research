@@ -77,8 +77,8 @@ class LabelEncoder(nn.Module):
 
 class STnet(nn.Module):
     def __init__(self, nfeat, nhid, nclass, gnn, nlayers=2, gat_heads=4, dropout=0.5, with_bn=True, with_bias=True):
+        
         super(STnet, self).__init__()
-
         self.nfeat = nfeat
         self.nhid = nhid
         self.nclass = nclass
@@ -92,7 +92,7 @@ class STnet(nn.Module):
         elif gnn == "GraphSAGE":
             self.gnn_model = GraphSAGE(nfeat, nhid, nhid, nlayers, dropout, with_bias, with_bn)
         else:
-            raise Exception("gnn mode error!")
+            raise Exception("Invalid GNN type!")
 
         self.classifier = Classifier(nhid, nclass)
 
@@ -123,30 +123,29 @@ class STnet(nn.Module):
 class linear_attention(nn.Module):
     def __init__(self, in_dim):
         super(linear_attention, self).__init__()
-        self.layerQ = nn.Linear(in_dim, in_dim)
-        self.layerK = nn.Linear(in_dim, in_dim)
-        self.layerV = nn.Linear(in_dim, in_dim)
+        self.layerQ = nn.Linear(in_dim, in_dim) # query from label embeddings
+        self.layerK = nn.Linear(in_dim, in_dim) # key from node embeddings
+        self.layerV = nn.Linear(in_dim, in_dim) # value from node embeddings
         self.initialize()
 
-    def initialize(self):
+    def initialize(self): # initialize parameters
         self.layerQ.reset_parameters()
         self.layerK.reset_parameters()
         self.layerV.reset_parameters()
 
     def forward(self, node_emb, label_emb, tau=0.5):
-        # pdb.set_trace()
         Q = self.layerQ(label_emb)
         K = self.layerK(node_emb)
         V = self.layerV(node_emb)
-        attention_score = torch.matmul(Q, K.transpose(-2, -1))
-        attention_weight = F.softmax(attention_score * tau, dim=1)
-        z = torch.matmul(attention_weight, V)
+        attention_score = torch.matmul(Q, K.transpose(-2, -1)) # [n_labels, n_nodes], scaled dot-product
+        attention_weight = F.softmax(attention_score * tau, dim=1) # [n_labels, n_nodes], softmax over nodes
+        z = torch.matmul(attention_weight, V) # [n_labels, in_dim], weighted sum
         return z
 
 
 class Tenet(nn.Module):
-    def __init__(self, nfeat, nhid, nclass, gnn, nlayers=2, gat_heads=4, dropout=0.5, tau=0.1, with_bn=True,
-                 with_bias=True):
+    def __init__(self, nfeat, nhid, nclass, gnn, nlayers=2, gat_heads=4, dropout=0.5, tau=0.1, with_bn=True, with_bias=True):
+
         super(Tenet, self).__init__()
         self.nfeat = nfeat
         self.nhid = nhid
@@ -162,7 +161,7 @@ class Tenet(nn.Module):
         elif gnn == "GraphSAGE":
             self.gnn_model = GraphSAGE(nfeat, nhid, nhid, nlayers, dropout, with_bias, with_bn)
         else:
-            raise Exception("gnn mode error!")
+            raise Exception("Invalid GNN type!")
 
         self.label_encoder = LabelEncoder(nhid, nclass)
         self.classifier = Classifier(nhid, nclass)
