@@ -157,9 +157,9 @@ def plot_group(dataset: str, model_type: str, agg_P: pd.DataFrame, agg_S: pd.Dat
 
 def main():
     parser = argparse.ArgumentParser(description='Aggregate epoch logs and plot mean±std validation loss for P and S')
-    parser.add_argument('--input_dir', type=str, default=osp.join('results', 'epoch_logs'),
+    parser.add_argument('--input_dir', type=str, default=osp.join('../results', 'epoch_logs'),
                         help='Directory containing epoch log CSVs grouped by type subfolders')
-    parser.add_argument('--out_dir', type=str, default=osp.join('results', 'plots', 'val_loss'),
+    parser.add_argument('--out_dir', type=str, default=osp.join('../results', 'plots', 'val_loss'),
                         help='Directory to save plots')
     parser.add_argument('--min_common', action='store_true',
                         help='Use only epochs common to all runs in a group (default: off)')

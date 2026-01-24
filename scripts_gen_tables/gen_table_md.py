@@ -2,18 +2,8 @@ import os.path as osp
 import pandas as pd
 from typing import List
 
-METRICS_DEFAULT = [
-    # 'num_epochs',
-    'test_avg_acc',
-    'AUC',
-    'F1',
-    'ECE',
-    'Brier',
-]
-
-# Rename map for display
+METRICS_DEFAULT = ['test_avg_acc', 'AUC', 'F1', 'ECE', 'Brier']
 METRIC_RENAME = {
-    # 'num_epochs': 'Epochs',
     'test_avg_acc': 'Accuracy',
     'AUC': 'AUC',
     'F1': 'F1',
@@ -53,22 +43,20 @@ def aggregate_ps(df: pd.DataFrame, metrics: List[str]) -> pd.DataFrame:
         mdf = agg[metric].reset_index()
         pivot_mean = mdf.pivot(index=['dataset', 'type'], columns='train_mode', values='mean')
         pivot_std = mdf.pivot(index=['dataset', 'type'], columns='train_mode', values='std')
-
         for mode in ['P', 'S']:
             if mode not in pivot_mean.columns:
                 pivot_mean[mode] = pd.NA
                 pivot_std[mode] = pd.NA
 
         metric_name = METRIC_RENAME.get(metric, metric)
-
         out[f'{metric_name}_P'] = (
             pivot_mean['P'].map(lambda x: '' if pd.isna(x) else f"{x:.4f}") +
-            r" $\pm$ " +
+            " ± " +
             pivot_std['P'].map(lambda x: '' if pd.isna(x) else f"{x:.4f}")
         )
         out[f'{metric_name}_S'] = (
             pivot_mean['S'].map(lambda x: '' if pd.isna(x) else f"{x:.4f}") +
-            r" $\pm$ " +
+            " ± " +
             pivot_std['S'].map(lambda x: '' if pd.isna(x) else f"{x:.4f}")
         )
 
@@ -78,7 +66,6 @@ def aggregate_ps(df: pd.DataFrame, metrics: List[str]) -> pd.DataFrame:
 
 def reshape_all_models(df: pd.DataFrame, metrics: List[str]) -> pd.DataFrame:
     rows = []
-
     for _, r in df.iterrows():
         base = r['type']
         if base not in BACKBONES:
@@ -88,7 +75,6 @@ def reshape_all_models(df: pd.DataFrame, metrics: List[str]) -> pd.DataFrame:
 
         row_base = {'dataset': r['dataset'], 'Model': base}
         row_lad = {'dataset': r['dataset'], 'Model': f'{base}+LAD'}
-
         for metric in metrics:
             metric_name = METRIC_RENAME.get(metric, metric)
             row_base[metric_name] = r[f'{metric_name}_P']
@@ -103,26 +89,24 @@ def reshape_all_models(df: pd.DataFrame, metrics: List[str]) -> pd.DataFrame:
     return out
 
 
-def build_latex_tables_per_dataset(df: pd.DataFrame, metrics: List[str]) -> str:
+def build_markdown_tables_per_dataset(df: pd.DataFrame, metrics: List[str]) -> str:
     agg_df = aggregate_ps(df, metrics)
     final_df = reshape_all_models(agg_df, metrics)
 
-    latex_str = '% Auto-generated LaTeX tables per dataset\n\n'
+    md_parts = ["<!-- Auto-generated Markdown tables per dataset -->\n"]
     datasets = final_df['dataset'].unique()
 
     for dataset in datasets:
         ddf = final_df[final_df['dataset'] == dataset].drop(columns=['dataset'])
-        latex_str += f"\\begin{{table}}[ht]\n\\centering\n\\small\n\\caption{{Results for {dataset}}}\n"
-        latex_str += ddf.to_latex(index=False, escape=False)
-        latex_str += "\\end{table}\n\n"
+        md_parts.append(f"### Results for {dataset}\n")
+        md_parts.append(ddf.to_markdown(index=False))
+        md_parts.append("\n\n")
+    return "".join(md_parts)
 
-    return latex_str
 
-
-# Example usage
-metrics_to_use = METRICS_DEFAULT
-df_summary = load_summary("results/summary.csv")
-latex_content = build_latex_tables_per_dataset(df_summary, metrics_to_use)
-
-with open("results/summary.tex", 'w', encoding='utf-8') as f:
-    f.write(latex_content)
+if __name__ == "__main__":
+    metrics_to_use = METRICS_DEFAULT
+    df_summary = load_summary("../results/summary.csv")
+    markdown_content = build_markdown_tables_per_dataset(df_summary, metrics_to_use)
+    with open("../results/summary.md", "w", encoding="utf-8") as f:
+        f.write(markdown_content)
