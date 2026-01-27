@@ -251,7 +251,6 @@ Hyperparameters for each dataset can be found described in `run_training_series.
 - **Best model**: GIN (85.79% accuracy) and GCN+LAD (85.79% accuracy, but higher AUC at 0.92)
 - **Observations**:
   - MUTAG is the smallest dataset (188 graphs), which may limit LAD's effectiveness
-  - The teacher model may overfit on such limited data, providing poor supervision for the student
   - High standard deviations indicate high variance due to small dataset size
   - Interestingly, AUC improvements with LAD are more consistent than accuracy improvements
 
@@ -349,7 +348,7 @@ Observations:
 
 ### When to use LAD?
 
-- **Medium to large datasets**: LAD requires sufficient data to train an effective teacher model. Small datasets have a risk of teacher overfitting (e.g., MUTAG results)
+- **Medium to large datasets**: LAD requires sufficient data to train an effective teacher model (e.g., MUTAG results).
 - **Binary classification tasks**: The mechanism shows more consistent improvements on 2-class problems. We have also seen some improvements, albeit smaller on multi-class datasets
 - **Graphs with clear class-distinguishing features**: Datasets like REDDIT-BINARY and PROTEINS where classes have distinct structural patterns
 - **Use GCN, GIN, or GraphSAGE backbones**: These architectures consistently benefit from LAD. We don't recommend using GAT
@@ -377,4 +376,5 @@ Observations:
 
 - Hong, X., Li, W., Wang, C., Lin, M., & Lu, S. (2024). Label Attentive Distillation for GNN-Based Graph Classification. *Proceedings of the AAAI Conference on Artificial Intelligence (AAAI-24)*.
 - Original implementation: https://github.com/XiaobinHong/LAD-GNN
+
 
