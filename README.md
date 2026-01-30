@@ -7,6 +7,9 @@
 - Michał Pędrak
 - Andrzej Wacławik
 
+Note: If you want to run the training yourself, check out [instalation and setup](#instalation--setup) and [run training](#run-training).
+
+
 ## 1. Introduction
 
 This project investigates the **LAD** mechanism introduced in the paper *"Label Attentive Distillation for GNN-Based Graph Classification"* presented at AAAI-24. Our goal was to independently evaluate and verify the effectiveness of the LAD approach across multiple GNN architectures and diverse graph classification datasets.
@@ -378,3 +381,53 @@ Observations:
 - Original implementation: https://github.com/XiaobinHong/LAD-GNN
 
 
+## Instalation & Setup
+
+### I. Clone the repository
+```bash
+git clone https://github.com/patczuch/ml_lad_gnn_research.git
+cd ml_lad_gnn_research
+```
+
+### II. Create a Virtual Environment
+We recommend using **Anaconda** or **Miniconda**:
+```bash
+conda create -n <env_name> python=3.12
+conda activate <env_name>
+```
+
+### III. Install PyTorch (with CUDA)
+Check your CUDA version by running **nvidia-smi**. After that, install the compatible version of PyTorch using proper version in '*pytorch-cuda*' parameter.
+
+Example for CUDA 12.1 / 13.0:
+
+```bash
+conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+```
+
+If you encounter any problems with installation, please visit https://pytorch.org/.
+
+### IV. Install additional dependencies
+```bash
+pip install -r requirements.txt
+```
+
+## Run training
+
+If you want to run multiple training series across backbones and modes, use the command:
+```bash
+python -m run_training_series --dataset <dataset_name> <other_optional_arguments>
+```
+
+where <dataset_name> is a name of selected dataset (e.g. "*MUTAG*"). 
+
+If you want to run single training for selected backbone, use the command:
+```bash
+python -m main --dataset <dataset_name> --backbone <backbone_name> <other_optional_arguments>
+```
+
+where additional parameter <backbone_name> is a name of selected backbone (e.g. "*GCN*").
+
+Currently supported datasets: *MUTAG*, *PROTEINS*, *COLLAB*, *IMDB-BINARY*, *IMDB-MULTI*, *REDDIT-BINARY* and *ogbg-molhiv*.
+
+Currently supported (implemented) backbones: *GAT*, *GCN*, *GIN* and *GraphSAGE*.
